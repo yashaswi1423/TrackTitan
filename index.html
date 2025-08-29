@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>TrackTitans – (Titanic force for tracking expenses)</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        /* --- General Styles --- */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #0f1419 0%, #1a1f2e 100%);
+            color: #f8fafc;
+            min-height: 100vh;
+            overflow-x: hidden;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+
+        /* --- Sidebar --- */
+        .sidebar {
+            position: fixed; left: 0; top: 0; width: 64px; height: 100vh;
+            background: rgba(15, 23, 42, 0.95);
+            backdrop-filter: blur(20px);
+            border-right: 1px solid rgba(148, 163, 184, 0.1);
+            display: flex; flex-direction: column; align-items: center;
+            padding: 24px 0; z-index: 1000;
+            transition: background 0.3s ease, border-color 0.3s ease;
+        }
+        .sidebar-logo {
+            width: 32px; height: 32px;
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            border-radius: 8px; display: flex; align-items: center;
+            justify-content: center; margin-bottom: 32px;
+            font-weight: bold; font-size: 18px;
+        }
+        .sidebar-nav { display: flex; flex-direction: column; gap: 24px; }
+        .nav-item {
+            width: 32px; height: 32px; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.3s ease;
+        }
+        .nav-item.active { background: rgba(79, 70, 229, 0.2); color: #818cf8; }
+        .nav-item:hover { background: rgba(51, 65, 85, 0.5); }
+
+        /* --- Main Content --- */
+        .main-content { margin-left: 64px; padding: 32px; max-width: 1400px; margin-right: auto; }
+        .header { margin-bottom: 32px; display: flex; justify-content: space-between; align-items: start; }
+        .header h1 { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+        .header p { color: #94a3b8; font-size: 16px; transition: color 0.3s ease; }
+        .balance-info { text-align: right; }
+        .balance-info p:first-child { color: #94a3b8; font-size: 14px; transition: color 0.3s ease; }
+        .balance-info .balance-value { font-size: 24px; font-weight: 600; color: #10b981; display: flex; align-items: center; gap: 8px;}
+        .edit-balance-btn { cursor: pointer; font-size: 16px; opacity: 0.6; transition: opacity 0.3s; }
+        .edit-balance-btn:hover { opacity: 1; }
+        
+        .theme-toggle-btn {
+            background: rgba(51, 65, 85, 0.5);
+            color: #f8fafc;
+            border: none;
+            width: 36px; height: 36px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 18px;
+            margin-left: 16px;
+            transition: all 0.3s ease;
+        }
+        .theme-toggle-btn:hover { background: rgba(51, 65, 85, 1); transform: scale(1.05); }
+
+        /* --- Grid Layout --- */
+        .dashboard-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 32px; }
+
+        /* --- Cards --- */
+        .card {
+            background: rgba(26, 31, 46, 0.5); backdrop-filter: blur(20px);
+            border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 16px; padding: 24px;
+            transition: all 0.3s ease;
+        }
+        .card:hover { border-color: rgba(148, 163, 184, 0.2); transform: translateY(-2px); }
+        .card h2, .card h3 { margin-bottom: 24px; font-size: 20px; font-weight: 600; }
+
+        /* --- Input Panel --- */
+        .input-group { margin-bottom: 20px; }
+        .input-group label { display: block; margin-bottom: 8px; font-size: 14px; font-weight: 500; color: #cbd5e1; transition: color 0.3s ease; }
+        .input-wrapper { position: relative; }
+        .input-icon { position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: #64748b; font-size: 18px; transition: color 0.3s ease; }
+        .input-field {
+            width: 100%; padding: 12px 16px 12px 44px;
+            background: rgba(51, 65, 85, 0.5);
+            border: 1px solid rgba(100, 116, 139, 0.5);
+            border-radius: 12px; color: #f8fafc; font-size: 16px;
+            transition: all 0.3s ease;
+        }
+        .input-field:disabled { background: rgba(51, 65, 85, 0.2); cursor: not-allowed; opacity: 0.7; }
+        .input-field:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+        .input-field::placeholder { color: #64748b; }
+        
+        /* --- Buttons --- */
+        .btn {
+            width: 100%; padding: 12px; border-radius: 12px;
+            font-size: 16px; font-weight: 600; cursor: pointer;
+            border: none; transition: all 0.3s ease;
+        }
+        .btn-primary { background: #4f46e5; color: white; }
+        .btn-primary:hover { background: #4338ca; }
+
+        /* --- Results Display --- */
+        .results-card { background: linear-gradient(135deg, rgba(79, 70, 229, 0.2), rgba(124, 58, 237, 0.2)); border: 1px solid rgba(79, 70, 229, 0.3); }
+        .result-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; }
+        .result-amount { text-align: center; margin-bottom: 16px; }
+        .result-amount .amount { font-size: 48px; font-weight: 700; color: #818cf8; display: block; }
+        .result-amount .calculation { color: #cbd5e1; font-size: 14px; margin-top: 8px; transition: color 0.3s ease; }
+
+        .share-btn {
+            background: rgba(255, 255, 255, 0.1); border: 1px solid rgba(255, 255, 255, 0.2);
+            color: #f8fafc; margin-top: 16px; font-weight: 500;
+        }
+        .share-btn:hover { background: rgba(255, 255, 255, 0.2); }
+
+        /* --- Chart Container --- */
+        .chart-container { height: 300px; margin-bottom: 16px; }
+
+        /* --- Activities --- */
+        .activity-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+        .add-btn {
+            background: #4f46e5; color: white; border: none;
+            width: 32px; height: 32px; border-radius: 8px;
+            cursor: pointer; font-size: 18px; transition: all 0.3s ease;
+        }
+        .add-btn:hover { background: #4338ca; transform: scale(1.05); }
+        .activity-list { max-height: 400px; overflow-y: auto; padding-right: 8px; }
+        .activity-item {
+            display: flex; justify-content: space-between; align-items: center;
+            background: rgba(51, 65, 85, 0.3); border-radius: 12px;
+            padding: 12px 16px; margin-bottom: 12px;
+            transition: all 0.3s ease;
+        }
+        .activity-item:hover { background: rgba(51, 65, 85, 0.5); }
+        .activity-info { display: flex; align-items: center; gap: 12px; flex-grow: 1; }
+        .activity-icon {
+            width: 40px; height: 40px; background: #374151; border-radius: 8px;
+            display: flex; align-items: center; justify-content: center; font-size: 20px;
+            transition: background 0.3s ease;
+        }
+        .activity-details h4 { font-size: 14px; font-weight: 500; margin-bottom: 2px; }
+        .activity-details p { font-size: 12px; color: #94a3b8; transition: color 0.3s ease; }
+        .activity-amount { text-align: right; }
+        .activity-amount .amount { font-size: 14px; font-weight: 600; margin-bottom: 2px; }
+        .delete-btn {
+            background: #ef4444; color: white; border: none;
+            width: 24px; height: 24px; border-radius: 50%;
+            cursor: pointer; font-size: 14px; opacity: 0;
+            transition: opacity 0.3s ease; margin-left: 10px;
+        }
+        .activity-item:hover .delete-btn { opacity: 1; }
+
+        /* --- Summary --- */
+        .activity-summary { margin-top: 24px; padding-top: 16px; border-top: 1px solid rgba(148, 163, 184, 0.1); transition: border-color 0.3s ease; }
+        .summary-row { display: flex; justify-content: space-between; margin-bottom: 8px; }
+        .summary-row span:first-child { color: #94a3b8; font-size: 14px; transition: color 0.3s ease; }
+        .summary-row span:last-child { font-size: 14px; font-weight: 600; }
+        
+        /* --- Chart Legend --- */
+        .chart-legend { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 16px; }
+        .legend-item { display: flex; align-items: center; gap: 8px; }
+        .legend-color { width: 12px; height: 12px; border-radius: 50%; }
+        .legend-label { font-size: 12px; color: #cbd5e1; transition: color 0.3s ease; }
+        
+        /* --- Modal --- */
+        .modal-overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.7); backdrop-filter: blur(5px);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 2000; opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .modal-overlay.visible { opacity: 1; pointer-events: auto; }
+        .modal-content {
+            background: #1a1f2e; border: 1px solid rgba(148, 163, 184, 0.1);
+            border-radius: 16px; padding: 24px; width: 90%; max-width: 400px;
+            transform: scale(0.95); transition: all 0.3s ease;
+        }
+        .modal-overlay.visible .modal-content { transform: scale(1); }
+        .modal-content h3 { margin-bottom: 16px; }
+        .modal-content p { color: #94a3b8; margin-bottom: 24px; font-size: 14px; transition: color 0.3s ease; }
+        .modal-actions { display: flex; gap: 12px; }
+        .btn-secondary { background-color: rgba(51, 65, 85, 0.5); color: #f8fafc; }
+        .btn-secondary:hover { background-color: rgba(51, 65, 85, 1); }
+
+        #customModalInput {
+            width: 100%; padding: 12px 16px;
+            background: rgba(51, 65, 85, 0.5);
+            border: 1px solid rgba(100, 116, 139, 0.5);
+            border-radius: 12px; color: #f8fafc; font-size: 16px;
+            transition: all 0.3s ease; margin-bottom: 24px;
+        }
+         #customModalInput:focus { outline: none; border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.1); }
+
+        /* --- Animation --- */
+        .fade-in { animation: fadeIn 0.5s ease-in forwards; opacity: 0; }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* --- Light Mode Styles --- */
+        body.light-mode {
+            background: #f1f5f9;
+            color: #0f172a;
+        }
+        .light-mode .sidebar { background: #ffffff; border-right-color: #e2e8f0; }
+        .light-mode .card { background: #ffffff; border-color: #e2e8f0; backdrop-filter: none; }
+        .light-mode .card:hover { border-color: #cbd5e1; }
+        .light-mode .header p, .light-mode .balance-info p:first-child, .light-mode .activity-details p, .light-mode .summary-row span:first-child, .light-mode .modal-content p { color: #64748b; }
+        .light-mode .input-group label, .light-mode .legend-label, .light-mode .result-amount .calculation { color: #334155; }
+        .light-mode .input-field, .light-mode #customModalInput { background: #f8fafc; border-color: #cbd5e1; color: #0f172a; }
+        .light-mode .input-field::placeholder, .light-mode .input-icon { color: #94a3b8; }
+        .light-mode .activity-item { background: rgba(226, 232, 240, 0.5); }
+        .light-mode .activity-item:hover { background: #e2e8f0; }
+        .light-mode .activity-icon { background: #e2e8f0; }
+        .light-mode .activity-summary { border-top-color: #e2e8f0; }
+        .light-mode .results-card { background: linear-gradient(135deg, rgba(79, 70, 229, 0.1), rgba(124, 58, 237, 0.1)); border-color: rgba(79, 70, 229, 0.2); }
+        .light-mode .modal-content { background: #ffffff; border-color: #e2e8f0; }
+        .light-mode .btn-secondary { background-color: #e2e8f0; color: #0f172a; }
+        .light-mode .btn-secondary:hover { background-color: #cbd5e1; }
+        .light-mode .theme-toggle-btn { background: #e2e8f0; color: #0f172a; }
+        .light-mode .theme-toggle-btn:hover { background: #cbd5e1; }
+        .light-mode .share-btn { background: rgba(0,0,0,0.05); border-color: rgba(0,0,0,0.1); color: #334155; }
+        .light-mode .share-btn:hover { background: rgba(0,0,0,0.1); }
+
+        /* --- Responsive Design --- */
+        @media (max-width: 1200px) { .dashboard-grid { grid-template-columns: 1fr 1fr; } }
+        @media (max-width: 768px) {
+            .dashboard-grid { grid-template-columns: 1fr; gap: 16px; }
+            .main-content { margin-left: 0; padding: 16px; }
+            .sidebar { display: none; }
+            .header { text-align: center; flex-direction: column; align-items: center; gap: 16px; }
+            .balance-info { text-align: center; }
+            .result-amount .amount { font-size: 36px; }
+            .card { padding: 16px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="sidebar">
+        <div class="sidebar-logo">₹</div>
+        <nav class="sidebar-nav">
+            <div class="nav-item active">📊</div>
+            <div class="nav-item">👥</div>
+            <div class="nav-item">🧮</div>
+        </nav>
+    </div>
+
+    <div class="main-content">
+        <div class="header">
+            <div>
+                <h1>TrackTitans</h1>
+                <p>A titanic force for tracking expenses</p>
+            </div>
+            <div class="balance-info">
+                <p>Account Balance</p>
+                <div class="balance-value">
+                    <span id="currentBalance">₹0</span>
+                    <span class="edit-balance-btn" id="editBalanceBtn">✏️</span>
+                    <button class="theme-toggle-btn" id="themeToggleBtn">🌓</button>
+                </div>
+            </div>
+        </div>
+
+        <div class="dashboard-grid">
+            <div id="left-column">
+                <div class="card fade-in">
+                    <h2>Expense Controls</h2>
+                    <div class="input-group">
+                        <label for="totalSpent">Total Money Spent (Auto-Calculated)</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">₹</span>
+                            <input type="number" id="totalSpent" class="input-field" placeholder="0.00" disabled>
+                        </div>
+                    </div>
+                    <div class="input-group">
+                        <label for="totalPersons">Number of Persons to Split</label>
+                        <div class="input-wrapper">
+                            <span class="input-icon">👥</span>
+                            <input type="number" id="totalPersons" class="input-field" placeholder="Enter number of people" min="1">
+                        </div>
+                    </div>
+                    <button class="btn btn-primary" id="finalizeBtn">Finalize Month & Reset</button>
+                </div>
+
+                <div class="card results-card fade-in" style="margin-top: 24px;">
+                    <div class="result-header">
+                        <h3>Per Person Spending</h3>
+                        <span style="font-size: 24px;">🧮</span>
+                    </div>
+                    <div class="result-amount">
+                        <span class="amount" id="perPersonAmount">₹0.00</span>
+                        <p class="calculation" id="calculationText">₹0 ÷ 1 person</p>
+                    </div>
+                    <button class="btn share-btn" id="shareBtn">🔗 Share Summary</button>
+                </div>
+            </div>
+
+            <div id="middle-column">
+                <div class="card fade-in">
+                    <h3>Expense Breakdown</h3>
+                    <div class="chart-container">
+                        <canvas id="pieChart"></canvas>
+                    </div>
+                    <div class="chart-legend" id="pieChartLegend"></div>
+                </div>
+                <div class="card fade-in" style="margin-top: 24px;">
+                    <h3>Monthly Trend (Last 30 Days)</h3>
+                    <div class="chart-container" style="height: 200px;">
+                        <canvas id="lineChart"></canvas>
+                    </div>
+                </div>
+            </div>
+
+            <div id="right-column">
+                <div class="card fade-in" style="height: 100%;">
+                    <div class="activity-header">
+                        <h3>Expense Activities</h3>
+                        <button class="add-btn" id="addActivityBtn">+</button>
+                    </div>
+                    <div class="activity-list" id="activityList"></div>
+                    <div class="activity-summary">
+                        <div class="summary-row">
+                            <span>Total Tracked Expenses</span>
+                            <span id="totalTracked">₹0</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="modal-overlay" id="confirmationModal">
+        <div class="modal-content">
+            <h3>Finalize Month?</h3>
+            <p>This will save the current month's total to your history and reset the board for new entries. This action cannot be undone.</p>
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="cancelResetBtn">Cancel</button>
+                <button class="btn btn-primary" id="confirmResetBtn">Confirm & Reset</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal-overlay" id="customModal">
+        <div class="modal-content">
+            <h3 id="customModalTitle">Modal Title</h3>
+            <p id="customModalMessage">Modal message goes here.</p>
+            <input type="text" id="customModalInput" style="display: none;">
+            <div class="modal-actions">
+                <button class="btn btn-secondary" id="customModalCancel">Cancel</button>
+                <button class="btn btn-primary" id="customModalOk">OK</button>
+            </div>
+        </div>
+    </div>
+
+
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            // --- DOM Elements ---
+            const dom = {
+                totalSpent: document.getElementById('totalSpent'),
+                totalPersons: document.getElementById('totalPersons'),
+                currentBalance: document.getElementById('currentBalance'),
+                editBalanceBtn: document.getElementById('editBalanceBtn'),
+                perPersonAmount: document.getElementById('perPersonAmount'),
+                calculationText: document.getElementById('calculationText'),
+                activityList: document.getElementById('activityList'),
+                totalTracked: document.getElementById('totalTracked'),
+                addActivityBtn: document.getElementById('addActivityBtn'),
+                finalizeBtn: document.getElementById('finalizeBtn'),
+                pieLegend: document.getElementById('pieChartLegend'),
+                modal: document.getElementById('confirmationModal'),
+                confirmResetBtn: document.getElementById('confirmResetBtn'),
+                cancelResetBtn: document.getElementById('cancelResetBtn'),
+                themeToggleBtn: document.getElementById('themeToggleBtn'),
+                shareBtn: document.getElementById('shareBtn'),
+                customModal: {
+                    overlay: document.getElementById('customModal'),
+                    title: document.getElementById('customModalTitle'),
+                    message: document.getElementById('customModalMessage'),
+                    input: document.getElementById('customModalInput'),
+                    okBtn: document.getElementById('customModalOk'),
+                    cancelBtn: document.getElementById('customModalCancel'),
+                }
+            };
+
+            // --- Chart Instances ---
+            let pieChart, lineChart;
+
+            // --- Application State ---
+            let state = {
+                accountBalance: 350000,
+                theme: 'dark',
+                currentSession: { 
+                    totalPersons: 1, 
+                    activities: [], 
+                },
+                history: []
+            };
+            
+            // --- Utility & Storage ---
+            const formatCurrency = (amount) => `₹${amount.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+            const saveData = () => localStorage.setItem('financeTrackerDataV4', JSON.stringify(state));
+            const loadData = () => {
+                const savedData = localStorage.getItem('financeTrackerDataV4');
+                if (savedData) state = JSON.parse(savedData);
+            };
+
+            // Automatically removes history records older than one month.
+            const pruneOldHistory = () => {
+                const oneMonthAgo = new Date();
+                oneMonthAgo.setMonth(oneMonthAgo.getMonth() - 1);
+
+                state.history = state.history.filter(record => {
+                    const recordDate = new Date(record.date);
+                    return recordDate >= oneMonthAgo;
+                });
+            };
+
+            // --- Custom Modal Functions ---
+            const showCustomModal = (options) => {
+                return new Promise((resolve) => {
+                    dom.customModal.title.textContent = options.title;
+                    dom.customModal.message.textContent = options.message;
+                    
+                    const hasInput = options.prompt || false;
+                    dom.customModal.input.style.display = hasInput ? 'block' : 'none';
+                    dom.customModal.input.type = options.inputType || 'text';
+                    dom.customModal.input.value = options.defaultValue || '';
+                    
+                    dom.customModal.cancelBtn.style.display = hasInput ? 'inline-block' : 'none';
+                    dom.customModal.overlay.classList.add('visible');
+
+                    if (hasInput) dom.customModal.input.focus();
+
+                    const onOk = () => {
+                        cleanup();
+                        resolve(hasInput ? dom.customModal.input.value : true);
+                    };
+                    const onCancel = () => {
+                        cleanup();
+                        resolve(null);
+                    };
+                    const cleanup = () => {
+                        dom.customModal.overlay.classList.remove('visible');
+                        dom.customModal.okBtn.removeEventListener('click', onOk);
+                        dom.customModal.cancelBtn.removeEventListener('click', onCancel);
+                    };
+                    dom.customModal.okBtn.addEventListener('click', onOk);
+                    dom.customModal.cancelBtn.addEventListener('click', onCancel);
+                });
+            };
+
+            // --- Core Update Functions ---
+            const updateUI = () => {
+                const session = state.currentSession;
+                const totalTracked = session.activities.reduce((sum, act) => sum + act.amount, 0);
+                
+                dom.totalPersons.value = session.totalPersons > 0 ? session.totalPersons : '';
+                dom.totalSpent.value = totalTracked > 0 ? totalTracked.toFixed(2) : '';
+
+                const perPerson = session.totalPersons > 0 ? totalTracked / session.totalPersons : 0;
+
+                dom.currentBalance.textContent = formatCurrency(state.accountBalance - totalTracked);
+                dom.perPersonAmount.textContent = formatCurrency(perPerson);
+                dom.calculationText.textContent = `₹${totalTracked.toLocaleString('en-IN')} ÷ ${session.totalPersons} ${session.totalPersons === 1 ? 'person' : 'people'}`;
+                dom.totalTracked.textContent = formatCurrency(totalTracked);
+                
+                renderActivities();
+                updatePieChart();
+                updateLineChart();
+                saveData();
+            };
+
+            const renderActivities = () => {
+                dom.activityList.innerHTML = '';
+                if (state.currentSession.activities.length === 0) {
+                    dom.activityList.innerHTML = '<p style="text-align:center; color:#94a3b8; font-size: 14px;">No activities added yet. Click + to start.</p>';
+                    return;
+                }
+                state.currentSession.activities.forEach(activity => {
+                    const perPersonAmount = state.currentSession.totalPersons > 0 ? activity.amount / state.currentSession.totalPersons : 0;
+                    const activityHTML = `
+                        <div class="activity-item" data-id="${activity.id}">
+                            <div class="activity-info">
+                                <div class="activity-icon">${activity.icon}</div>
+                                <div class="activity-details">
+                                    <h4>${activity.name}</h4>
+                                    <p>${formatCurrency(perPersonAmount)} per person</p>
+                                </div>
+                            </div>
+                            <div class="activity-amount">
+                                <p class="amount">${formatCurrency(activity.amount)}</p>
+                            </div>
+                            <button class="delete-btn">×</button>
+                        </div>
+                    `;
+                    dom.activityList.insertAdjacentHTML('beforeend', activityHTML);
+                });
+            };
+
+            // --- Event Handlers ---
+            const handlePersonChange = () => {
+                state.currentSession.totalPersons = parseInt(dom.totalPersons.value) || 1;
+                updateUI();
+            };
+
+            const handleBalanceEdit = async () => {
+                const newBalanceStr = await showCustomModal({
+                    title: "Edit Account Balance",
+                    message: "Enter your total account balance:",
+                    prompt: true,
+                    inputType: 'number',
+                    defaultValue: state.accountBalance
+                });
+                if (newBalanceStr === null) return;
+                const newBalance = parseFloat(newBalanceStr);
+                if (!isNaN(newBalance) && newBalance >= 0) {
+                    state.accountBalance = newBalance;
+                    updateUI();
+                } else {
+                    await showCustomModal({ title: "Invalid Input", message: "Please enter a valid, non-negative number." });
+                }
+            };
+            
+            const handleAddActivity = async () => {
+                const name = await showCustomModal({ title: "New Expense", message: "Enter expense name (e.g., Dinner):", prompt: true });
+                if (!name) return;
+                const amountStr = await showCustomModal({ title: `Amount for ${name}`, message: "Enter the total amount for this expense:", prompt: true, inputType: 'number' });
+                if (!amountStr) return;
+                const amount = parseFloat(amountStr);
+                if (isNaN(amount) || amount <= 0) {
+                    await showCustomModal({ title: "Invalid Amount", message: "Please enter a valid, positive number." });
+                    return;
+                }
+                const currentTrackedTotal = state.currentSession.activities.reduce((sum, act) => sum + act.amount, 0);
+                const remainingBalance = state.accountBalance - currentTrackedTotal;
+                if (amount > remainingBalance) {
+                    await showCustomModal({ title: "Insufficient Balance", message: `This expense exceeds your remaining balance of ${formatCurrency(remainingBalance)}.` });
+                    return;
+                }
+                const icons = ['💰', '🍔', '🛍️', '🎁', '🏠', '💡', ' bills'];
+                state.currentSession.activities.push({
+                    id: Date.now(),
+                    name,
+                    amount,
+                    icon: icons[Math.floor(Math.random() * icons.length)]
+                });
+                updateUI();
+            };
+
+            const handleDeleteActivity = (e) => {
+                if (e.target.classList.contains('delete-btn')) {
+                    const item = e.target.closest('.activity-item');
+                    const id = parseInt(item.dataset.id);
+                    state.currentSession.activities = state.currentSession.activities.filter(act => act.id !== id);
+                    updateUI();
+                }
+            };
+
+            const finalizeSession = () => {
+                const totalTracked = state.currentSession.activities.reduce((sum, act) => sum + act.amount, 0);
+                if (totalTracked > 0) {
+                    state.history.push({
+                        date: new Date().toISOString(),
+                        totalSpent: totalTracked
+                    });
+                    state.accountBalance -= totalTracked;
+                }
+                state.currentSession = { totalPersons: state.currentSession.totalPersons, activities: [] };
+                dom.modal.classList.remove('visible');
+                updateUI();
+            };
+            
+            const handleThemeToggle = () => {
+                state.theme = state.theme === 'dark' ? 'light' : 'dark';
+                document.body.classList.toggle('light-mode');
+                saveData();
+            };
+
+            const handleShare = async () => {
+                const totalTracked = state.currentSession.activities.reduce((sum, act) => sum + act.amount, 0);
+                if (totalTracked <= 0) {
+                    await showCustomModal({ title: "Empty List", message: "Add some expenses before sharing!" });
+                    return;
+                }
+                const perPerson = state.currentSession.totalPersons > 0 ? totalTracked / state.currentSession.totalPersons : 0;
+                let summary = `📊 Expense Summary 📊\n\n`;
+                summary += `Total Spent: ${formatCurrency(totalTracked)}\n`;
+                summary += `Split among: ${state.currentSession.totalPersons} people\n`;
+                summary += `------------------------------\n`;
+                summary += `AMOUNT PER PERSON: ${formatCurrency(perPerson)}\n`;
+                summary += `------------------------------\n\n`;
+                if (state.currentSession.activities.length > 0) {
+                    summary += `Itemized Breakdown:\n`;
+                    state.currentSession.activities.forEach(act => {
+                        const itemPerPerson = state.currentSession.totalPersons > 0 ? act.amount / state.currentSession.totalPersons : 0;
+                        summary += `- ${act.name}: ${formatCurrency(act.amount)} (${formatCurrency(itemPerPerson)} each)\n`;
+                    });
+                }
+                if (navigator.share) {
+                    await navigator.share({ title: 'Expense Summary', text: summary });
+                } else {
+                    await navigator.clipboard.writeText(summary);
+                    await showCustomModal({ title: "Copied!", message: "Summary copied to clipboard." });
+                }
+            };
+
+            // --- Chart Logic ---
+            const initCharts = () => {
+                const pieCtx = document.getElementById('pieChart').getContext('2d');
+                pieChart = new Chart(pieCtx, {
+                    type: 'doughnut', data: { labels: [], datasets: [{ data: [], backgroundColor: [], borderWidth: 0, cutout: '60%' }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } } }
+                });
+
+                const lineCtx = document.getElementById('lineChart').getContext('2d');
+                lineChart = new Chart(lineCtx, {
+                    type: 'line', data: { labels: [], datasets: [{ data: [], borderColor: '#4f46e5', backgroundColor: 'rgba(79, 70, 229, 0.1)', borderWidth: 3, fill: true, tension: 0.4 }] },
+                    options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { display: false }, ticks: { color: '#94a3b8' } }, y: { display: false } } }
+                });
+            };
+            
+            const updatePieChart = () => {
+                const activities = state.currentSession.activities;
+                const labels = activities.map(a => a.name);
+                const data = activities.map(a => a.amount);
+                const colors = ['#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#3b82f6', '#6b7280'];
+                pieChart.data.labels = labels;
+                pieChart.data.datasets[0].data = data;
+                pieChart.data.datasets[0].backgroundColor = labels.map((_, i) => colors[i % colors.length]);
+                pieChart.update();
+                dom.pieLegend.innerHTML = '';
+                labels.forEach((label, index) => {
+                    if (data[index] > 0) {
+                        dom.pieLegend.innerHTML += `<div class="legend-item"><div class="legend-color" style="background-color: ${colors[index % colors.length]}"></div><span class="legend-label">${label}</span></div>`;
+                    }
+                });
+            };
+            
+            const updateLineChart = () => {
+                const historyData = state.history.map(h => h.totalSpent);
+                const historyLabels = state.history.map(h => new Date(h.date).toLocaleDateString('en-US', { month: 'short' }));
+                const currentTotal = state.currentSession.activities.reduce((sum, act) => sum + act.amount, 0);
+                lineChart.data.labels = [...historyLabels, 'Current'];
+                lineChart.data.datasets[0].data = [...historyData, currentTotal];
+                lineChart.update();
+            };
+
+            // --- Initializer ---
+            const init = () => {
+                loadData();
+                pruneOldHistory();
+                
+                if (state.theme === 'light') { document.body.classList.add('light-mode'); }
+
+                initCharts();
+                updateUI();
+                
+                dom.totalPersons.addEventListener('input', handlePersonChange);
+                dom.editBalanceBtn.addEventListener('click', handleBalanceEdit);
+                dom.addActivityBtn.addEventListener('click', handleAddActivity);
+                dom.activityList.addEventListener('click', handleDeleteActivity);
+                dom.finalizeBtn.addEventListener('click', () => dom.modal.classList.add('visible'));
+                dom.cancelResetBtn.addEventListener('click', () => dom.modal.classList.remove('visible'));
+                dom.confirmResetBtn.addEventListener('click', finalizeSession);
+                dom.themeToggleBtn.addEventListener('click', handleThemeToggle);
+                dom.shareBtn.addEventListener('click', handleShare);
+
+                document.querySelectorAll('.fade-in').forEach((el, index) => {
+                    el.style.animationDelay = `${index * 0.1}s`;
+                });
+            };
+            
+            init();
+        });
+    </script>
+</body>
+</html>
